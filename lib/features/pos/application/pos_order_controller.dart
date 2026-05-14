@@ -17,6 +17,7 @@ class PosOrderController extends Notifier<PosOrderState> {
 
   void addItem(MenuItemModel item) {
     final itemId = item.id ?? 0;
+    if (itemId <= 0) return;
     final items = [...state.items];
     final index = items.indexWhere((cartItem) => cartItem.menuItemId == itemId);
 
@@ -31,6 +32,7 @@ class PosOrderController extends Notifier<PosOrderState> {
   }
 
   void increaseQuantity(int menuItemId) {
+    if (menuItemId <= 0) return;
     state = state.copyWith(
       items: [
         for (final item in state.items)
@@ -43,6 +45,7 @@ class PosOrderController extends Notifier<PosOrderState> {
   }
 
   void decreaseQuantity(int menuItemId) {
+    if (menuItemId <= 0) return;
     final items = <PosCartItem>[];
     for (final item in state.items) {
       if (item.menuItemId != menuItemId) {
@@ -76,7 +79,7 @@ class PosOrderController extends Notifier<PosOrderState> {
   }
 
   void setDiscountValue(double value) {
-    final safeValue = value < 0 ? 0.0 : value;
+    final safeValue = value.isFinite && value > 0 ? value : 0.0;
     final cappedValue = switch (state.discountType) {
       DiscountType.percent => safeValue > 100 ? 100.0 : safeValue,
       DiscountType.fixed =>

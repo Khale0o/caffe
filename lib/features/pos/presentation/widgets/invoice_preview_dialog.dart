@@ -26,6 +26,8 @@ class _InvoicePreviewDialogState extends ConsumerState<InvoicePreviewDialog> {
     final order = widget.invoice.order;
     final size = MediaQuery.sizeOf(context);
 
+    final isBusy = _isExporting || _isPrinting;
+
     return AlertDialog(
       backgroundColor: AppColors.surface,
       title: const Text('معاينة الفاتورة'),
@@ -161,11 +163,11 @@ class _InvoicePreviewDialogState extends ConsumerState<InvoicePreviewDialog> {
               runSpacing: 8,
               children: [
                 TextButton(
-                  onPressed: _showSharePlaceholder,
+                  onPressed: isBusy ? null : _showSharePlaceholder,
                   child: const Text('مشاركة لاحقاً'),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: _isExporting ? null : _exportPdf,
+                  onPressed: isBusy ? null : _exportPdf,
                   icon: _isExporting
                       ? const SizedBox(
                           width: 16,
@@ -176,7 +178,7 @@ class _InvoicePreviewDialogState extends ConsumerState<InvoicePreviewDialog> {
                   label: const Text('حفظ PDF'),
                 ),
                 FilledButton.icon(
-                  onPressed: _isPrinting ? null : _printPdf,
+                  onPressed: isBusy ? null : _printPdf,
                   icon: _isPrinting
                       ? const SizedBox(
                           width: 16,
@@ -187,7 +189,7 @@ class _InvoicePreviewDialogState extends ConsumerState<InvoicePreviewDialog> {
                   label: const Text('طباعة PDF'),
                 ),
                 OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: isBusy ? null : () => Navigator.of(context).pop(),
                   child: const Text('إغلاق'),
                 ),
               ],
@@ -199,6 +201,7 @@ class _InvoicePreviewDialogState extends ConsumerState<InvoicePreviewDialog> {
   }
 
   Future<void> _exportPdf() async {
+    if (_isExporting || _isPrinting) return;
     setState(() => _isExporting = true);
     try {
       final path = await ref
@@ -217,6 +220,7 @@ class _InvoicePreviewDialogState extends ConsumerState<InvoicePreviewDialog> {
   }
 
   Future<void> _printPdf() async {
+    if (_isExporting || _isPrinting) return;
     setState(() => _isPrinting = true);
     try {
       await ref.read(invoicePdfServiceProvider).printInvoicePdf(widget.invoice);

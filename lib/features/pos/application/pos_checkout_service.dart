@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sqflite/sqflite.dart';
 
 import '../../../shared/models/customer_model.dart';
 import '../../../shared/models/order_item_model.dart';
@@ -39,68 +40,82 @@ class PosCheckoutService {
       throw const PosCheckoutException('إجمالي الطلب غير صحيح');
     }
 
-    final now = DateTime.now();
-    final orderNumber = await _orderRepository.getNextOrderNumber();
-    final trimmedTableNumber = tableNumber.trim();
-    final order = OrderModel(
-      orderNumber: orderNumber,
-      customerId: customer?.id,
-      customerName: customer?.name,
-      customerPhone: customer?.phone,
-      tableNumber: trimmedTableNumber.isEmpty ? null : trimmedTableNumber,
-      paymentMethod: paymentMethod,
-      subtotal: totals.subtotal,
-      discountValue: orderState.discountValue,
-      discountType: orderState.discountType.storageValue,
-      discountAmount: totals.discountAmount,
-      taxAmount: totals.vatAmount,
-      total: totals.grandTotal,
-      status: 'completed',
-      createdAt: now,
-    );
-    final items = orderState.items.map((item) {
-      return OrderItemModel(
-        orderId: 0,
-        menuItemId: item.menuItemId,
-        itemName: item.name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        total: item.total,
+    try {
+      final now = DateTime.now();
+      final orderNumber = await _orderRepository.getNextOrderNumber();
+      final trimmedTableNumber = tableNumber.trim();
+      final order = OrderModel(
+        orderNumber: orderNumber,
+        customerId: customer?.id,
+        customerName: customer?.name,
+        customerPhone: customer?.phone,
+        tableNumber: trimmedTableNumber.isEmpty ? null : trimmedTableNumber,
+        paymentMethod: paymentMethod,
+        subtotal: totals.subtotal,
+        discountValue: orderState.discountValue,
+        discountType: orderState.discountType.storageValue,
+        discountAmount: totals.discountAmount,
+        taxAmount: totals.vatAmount,
+        total: totals.grandTotal,
+        status: 'completed',
+        createdAt: now,
       );
-    }).toList();
+      final items = orderState.items.map((item) {
+        return OrderItemModel(
+          orderId: 0,
+          menuItemId: item.menuItemId,
+          itemName: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+        );
+      }).toList();
 
-    final orderId = await _orderRepository.createOrder(order, items);
-    final savedOrder = await _orderRepository.getOrderById(orderId);
-    final savedItems = await _orderRepository.getOrderItems(orderId);
-    final settings = await _settingsRepository.getAll();
+      final orderId = await _orderRepository.createOrder(order, items);
+      final savedOrder = await _orderRepository.getOrderById(orderId);
+      final savedItems = await _orderRepository.getOrderItems(orderId);
+      final settings = await _settingsRepository.getAll();
 
-    if (savedOrder == null || savedItems.isEmpty) {
-      throw const PosCheckoutException('تم الحفظ ولكن تعذر تحميل الفاتورة');
+      if (savedOrder == null || savedItems.isEmpty) {
+        throw const PosCheckoutException('تم الحفظ ولكن تعذر تحميل الفاتورة');
+      }
+
+      return SavedOrderInvoice(
+        order: savedOrder,
+        items: savedItems,
+        cafeName: _setting(settings, 'cafe_name', 'كافيه النيل'),
+        cafePhone: _setting(settings, 'cafe_phone', ''),
+        cafeAddress: _setting(settings, 'cafe_address', ''),
+        footerMessage: _setting(settings, 'invoice_footer', ''),
+      );
+    } on PosCheckoutException {
+      rethrow;
+    } on DatabaseException {
+      throw const PosCheckoutException('تعذر حفظ الطلب في قاعدة البيانات');
+    } on StateError {
+      throw const PosCheckoutException('تعذر حفظ الطلب بسبب بيانات غير صالحة');
     }
-
-    return SavedOrderInvoice(
-      order: savedOrder,
-      items: savedItems,
-      cafeName: _setting(settings, 'cafe_name', 'كافيه النيل'),
-      cafePhone: _setting(settings, 'cafe_phone', ''),
-      cafeAddress: _setting(settings, 'cafe_address', ''),
-      footerMessage: _setting(settings, 'invoice_footer', ''),
-    );
   }
 
   Future<SavedOrderInvoice?> loadInvoice(int orderId) async {
-    final orderWithItems = await _orderRepository.getOrderWithItems(orderId);
-    if (orderWithItems == null) return null;
+    if (orderId <= 0) return null;
 
-    final settings = await _settingsRepository.getAll();
-    return SavedOrderInvoice(
-      order: orderWithItems.order,
-      items: orderWithItems.items,
-      cafeName: _setting(settings, 'cafe_name', 'كافيه النيل'),
-      cafePhone: _setting(settings, 'cafe_phone', ''),
-      cafeAddress: _setting(settings, 'cafe_address', ''),
-      footerMessage: _setting(settings, 'invoice_footer', ''),
-    );
+    try {
+      final orderWithItems = await _orderRepository.getOrderWithItems(orderId);
+      if (orderWithItems == null || orderWithItems.items.isEmpty) return null;
+
+      final settings = await _settingsRepository.getAll();
+      return SavedOrderInvoice(
+        order: orderWithItems.order,
+        items: orderWithItems.items,
+        cafeName: _setting(settings, 'cafe_name', 'كافيه النيل'),
+        cafePhone: _setting(settings, 'cafe_phone', ''),
+        cafeAddress: _setting(settings, 'cafe_address', ''),
+        footerMessage: _setting(settings, 'invoice_footer', ''),
+      );
+    } on DatabaseException {
+      return null;
+    }
   }
 
   String _setting(Map<String, String?> settings, String key, String fallback) {

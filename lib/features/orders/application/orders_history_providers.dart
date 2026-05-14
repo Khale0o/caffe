@@ -86,6 +86,7 @@ final orderDetailsProvider = FutureProvider.family<OrderWithItems?, int>((
   ref,
   orderId,
 ) {
+  if (orderId <= 0) return Future.value(null);
   return ref.watch(orderRepositoryProvider).getOrderWithItems(orderId);
 });
 
@@ -93,5 +94,6 @@ final reopenedInvoiceProvider = FutureProvider.family<SavedOrderInvoice?, int>((
   ref,
   orderId,
 ) async {
+  if (orderId <= 0) return null;
   return ref.watch(posCheckoutServiceProvider).loadInvoice(orderId);
 });

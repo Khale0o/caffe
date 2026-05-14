@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/admin_screen.dart';
 import '../../features/customer_entry/presentation/customer_entry_screen.dart';
 import '../../features/orders/presentation/orders_history_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
@@ -36,17 +37,19 @@ final appRouter = GoRouter(
       path: AppRoutes.pos,
       name: 'pos',
       builder: (context, state) {
-        final customerId = int.tryParse(
+        final parsedCustomerId = int.tryParse(
           state.uri.queryParameters['customerId'] ?? '',
         );
+        final customerId = parsedCustomerId != null && parsedCustomerId > 0
+            ? parsedCustomerId
+            : null;
         return PosScreen(customerId: customerId);
       },
     ),
     GoRoute(
       path: AppRoutes.admin,
       name: 'admin',
-      builder: (context, state) =>
-          const _PlaceholderScreen(title: 'لوحة الإدارة'),
+      builder: (context, state) => const AdminScreen(),
     ),
     GoRoute(
       path: AppRoutes.reports,

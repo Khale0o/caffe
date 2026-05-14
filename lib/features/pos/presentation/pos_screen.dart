@@ -39,7 +39,11 @@ final posVatSettingsProvider = FutureProvider<({bool enabled, double percent})>(
   (ref) async {
     final settings = await ref.watch(settingsRepositoryProvider).getAll();
     final enabled = (settings['vat_enabled'] ?? 'true').toLowerCase() == 'true';
-    final percent = double.tryParse(settings['vat_percent'] ?? '') ?? 14;
+    final parsedPercent = double.tryParse(settings['vat_percent'] ?? '');
+    final percent =
+        parsedPercent == null || !parsedPercent.isFinite || parsedPercent < 0
+        ? 14.0
+        : parsedPercent.clamp(0.0, 100.0);
     return (enabled: enabled, percent: percent);
   },
 );
@@ -63,6 +67,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   int? _selectedCategoryId;
   String _paymentMethod = 'كاش';
   bool _isSaving = false;
+  bool _isReviewDialogOpen = false;
 
   @override
   void initState() {
@@ -275,32 +280,41 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   Future<void> _reviewOrder(CustomerModel? customer) async {
+    if (_isSaving || _isReviewDialogOpen) return;
+    FocusScope.of(context).unfocus();
+
     final orderState = ref.read(posOrderControllerProvider);
     if (orderState.items.isEmpty) {
       _showMessage('لا يمكن مراجعة الطلب قبل إضافة أصناف', isError: true);
       return;
     }
 
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return _OrderReviewDialog(
-          customerName: customer?.name ?? 'عميل عادي',
-          tableNumber: _tableController.text.trim(),
-          paymentMethod: _paymentMethod,
-          items: orderState.items,
-          totals: orderState.totals,
-          onConfirmOrder: () => _confirmOrder(customer, orderState),
-        );
-      },
-    );
+    _isReviewDialogOpen = true;
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return _OrderReviewDialog(
+            customerName: customer?.name ?? 'عميل عادي',
+            tableNumber: _tableController.text.trim(),
+            paymentMethod: _paymentMethod,
+            items: orderState.items,
+            totals: orderState.totals,
+            isSaving: _isSaving,
+            onConfirmOrder: () => _confirmOrder(customer, orderState),
+          );
+        },
+      );
+    } finally {
+      _isReviewDialogOpen = false;
+    }
   }
 
   Future<void> _confirmOrder(
     CustomerModel? customer,
     PosOrderState orderState,
   ) async {
-    Navigator.of(context).pop();
+    if (_isSaving) return;
 
     if (orderState.items.isEmpty) {
       _showMessage('لا يمكن حفظ طلب بدون أصناف', isError: true);
@@ -308,6 +322,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     }
 
     setState(() => _isSaving = true);
+    Navigator.of(context).pop();
     try {
       final invoice = await ref
           .read(posCheckoutServiceProvider)
@@ -472,6 +487,7 @@ class _MenuSection extends StatelessWidget {
               );
               final search = TextField(
                 controller: searchController,
+                textInputAction: TextInputAction.search,
                 decoration: _inputDecoration(
                   label: 'بحث باسم الصنف',
                   icon: Icons.search_rounded,
@@ -827,6 +843,9 @@ class _CartPanelBody extends StatelessWidget {
           const Divider(height: 28),
           TextField(
             controller: tableController,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: _inputDecoration(
               label: 'رقم الترابيزة (اختياري)',
               icon: Icons.table_restaurant_rounded,
@@ -869,10 +888,12 @@ class _CartPanelBody extends StatelessWidget {
           TextField(
             controller: discountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.done,
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
             ],
             onChanged: onDiscountChanged,
+            onSubmitted: (_) => FocusScope.of(context).unfocus(),
             decoration: _inputDecoration(
               label: 'الخصم',
               icon: Icons.discount_rounded,
@@ -936,7 +957,7 @@ class _MobileCartSummaryButton extends ConsumerWidget {
     );
 
     return FilledButton(
-      onPressed: () => _openCartSheet(context),
+      onPressed: isSaving ? null : () => _openCartSheet(context),
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
@@ -964,6 +985,7 @@ class _MobileCartSummaryButton extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       builder: (context) {
+        final viewInsets = MediaQuery.viewInsetsOf(context);
         return SafeArea(
           child: DraggableScrollableSheet(
             expand: false,
@@ -973,7 +995,14 @@ class _MobileCartSummaryButton extends ConsumerWidget {
             builder: (context, scrollController) {
               return SingleChildScrollView(
                 controller: scrollController,
-                padding: const EdgeInsets.all(16),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  16 + viewInsets.bottom,
+                ),
                 child: _CartPanel(
                   customer: customer,
                   tableController: tableController,
@@ -1127,6 +1156,7 @@ class _OrderReviewDialog extends StatelessWidget {
     required this.paymentMethod,
     required this.items,
     required this.totals,
+    required this.isSaving,
     required this.onConfirmOrder,
   });
 
@@ -1135,6 +1165,7 @@ class _OrderReviewDialog extends StatelessWidget {
   final String paymentMethod;
   final List<PosCartItem> items;
   final PosTotals totals;
+  final bool isSaving;
   final VoidCallback onConfirmOrder;
 
   @override
@@ -1187,8 +1218,14 @@ class _OrderReviewDialog extends StatelessWidget {
           child: const Text('رجوع للتعديل'),
         ),
         FilledButton(
-          onPressed: onConfirmOrder,
-          child: const Text('تأكيد الطلب'),
+          onPressed: isSaving ? null : onConfirmOrder,
+          child: isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('تأكيد الطلب'),
         ),
       ],
     );

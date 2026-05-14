@@ -108,4 +108,19 @@ void main() {
       expect(state.vatPercent, 10);
     },
   );
+
+  test('controller ignores invalid item ids and non-finite discounts', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final controller = container.read(posOrderControllerProvider.notifier);
+
+    controller.addItem(menuItem(id: 0, name: 'Invalid', price: 50));
+    controller.increaseQuantity(0);
+    controller.decreaseQuantity(-1);
+    controller.setDiscountValue(double.nan);
+
+    final state = container.read(posOrderControllerProvider);
+    expect(state.items, isEmpty);
+    expect(state.discountValue, 0);
+  });
 }

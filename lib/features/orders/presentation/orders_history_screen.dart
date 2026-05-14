@@ -21,6 +21,7 @@ class OrdersHistoryScreen extends ConsumerStatefulWidget {
 
 class _OrdersHistoryScreenState extends ConsumerState<OrdersHistoryScreen> {
   final _searchController = TextEditingController();
+  bool _isDetailsDialogOpen = false;
 
   @override
   void dispose() {
@@ -102,6 +103,10 @@ class _OrdersHistoryScreenState extends ConsumerState<OrdersHistoryScreen> {
   }
 
   Future<void> _openOrderDetails(OrderModel order) async {
+    if (_isDetailsDialogOpen || order.id == null || order.id! <= 0) return;
+    FocusScope.of(context).unfocus();
+
+    _isDetailsDialogOpen = true;
     try {
       await showDialog<void>(
         context: context,
@@ -112,6 +117,8 @@ class _OrdersHistoryScreenState extends ConsumerState<OrdersHistoryScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('تعذر فتح تفاصيل الطلب')));
+    } finally {
+      _isDetailsDialogOpen = false;
     }
   }
 }
@@ -369,14 +376,22 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _OrderDetailsDialog extends ConsumerWidget {
+class _OrderDetailsDialog extends ConsumerStatefulWidget {
   const _OrderDetailsDialog({required this.orderId});
 
   final int orderId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detailsAsync = ref.watch(orderDetailsProvider(orderId));
+  ConsumerState<_OrderDetailsDialog> createState() =>
+      _OrderDetailsDialogState();
+}
+
+class _OrderDetailsDialogState extends ConsumerState<_OrderDetailsDialog> {
+  bool _isOpeningInvoice = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final detailsAsync = ref.watch(orderDetailsProvider(widget.orderId));
     final size = MediaQuery.sizeOf(context);
 
     return AlertDialog(
@@ -407,18 +422,28 @@ class _OrderDetailsDialog extends ConsumerWidget {
           child: const Text('إغلاق'),
         ),
         FilledButton.icon(
-          onPressed: () => _openInvoice(context, ref),
-          icon: const Icon(Icons.receipt_long_rounded),
-          label: const Text('فتح الفاتورة'),
+          onPressed: _isOpeningInvoice ? null : _openInvoice,
+          icon: _isOpeningInvoice
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.receipt_long_rounded),
+          label: Text(_isOpeningInvoice ? 'جاري الفتح' : 'فتح الفاتورة'),
         ),
       ],
     );
   }
 
-  Future<void> _openInvoice(BuildContext context, WidgetRef ref) async {
+  Future<void> _openInvoice() async {
+    if (_isOpeningInvoice) return;
+    setState(() => _isOpeningInvoice = true);
     try {
-      final invoice = await ref.read(reopenedInvoiceProvider(orderId).future);
-      if (!context.mounted) return;
+      final invoice = await ref.read(
+        reopenedInvoiceProvider(widget.orderId).future,
+      );
+      if (!mounted) return;
 
       if (invoice == null) {
         ScaffoldMessenger.of(
@@ -432,10 +457,14 @@ class _OrderDetailsDialog extends ConsumerWidget {
         builder: (context) => InvoicePreviewDialog(invoice: invoice),
       );
     } catch (_) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('تعذر فتح الفاتورة')));
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningInvoice = false);
+      }
     }
   }
 }

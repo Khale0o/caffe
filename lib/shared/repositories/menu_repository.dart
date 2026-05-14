@@ -55,6 +55,7 @@ class MenuRepository {
   Future<List<MenuItemModel>> getMenuItems({
     int? categoryId,
     bool availableOnly = false,
+    String? searchText,
   }) async {
     final db = await _db;
     final filters = <String>[];
@@ -68,6 +69,10 @@ class MenuRepository {
       filters.add('is_available = ?');
       args.add(1);
     }
+    if (searchText != null && searchText.trim().isNotEmpty) {
+      filters.add('name LIKE ?');
+      args.add('%${searchText.trim()}%');
+    }
 
     final rows = await db.query(
       DatabaseTables.menuItems,
@@ -76,6 +81,25 @@ class MenuRepository {
       orderBy: 'name ASC',
     );
     return rows.map(MenuItemModel.fromMap).toList();
+  }
+
+  Future<bool> categoryHasMenuItems(int categoryId) async {
+    final db = await _db;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM ${DatabaseTables.menuItems} WHERE category_id = ?',
+      [categoryId],
+    );
+    return (Sqflite.firstIntValue(result) ?? 0) > 0;
+  }
+
+  Future<int> setCategoryActive(int id, bool isActive) async {
+    final db = await _db;
+    return db.update(
+      DatabaseTables.categories,
+      {'is_active': isActive ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> createMenuItem(MenuItemModel item) async {
@@ -97,6 +121,28 @@ class MenuRepository {
     final db = await _db;
     return db.delete(
       DatabaseTables.menuItems,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<bool> menuItemHasOrders(int menuItemId) async {
+    final db = await _db;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM ${DatabaseTables.orderItems} WHERE menu_item_id = ?',
+      [menuItemId],
+    );
+    return (Sqflite.firstIntValue(result) ?? 0) > 0;
+  }
+
+  Future<int> setMenuItemAvailable(int id, bool isAvailable) async {
+    final db = await _db;
+    return db.update(
+      DatabaseTables.menuItems,
+      {
+        'is_available': isAvailable ? 1 : 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );

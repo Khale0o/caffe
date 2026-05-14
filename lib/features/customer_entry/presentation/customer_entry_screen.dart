@@ -41,6 +41,9 @@ class _CustomerEntryScreenState extends ConsumerState<CustomerEntryScreen> {
   }
 
   Future<void> _searchCustomer() async {
+    if (_isSearching || _isSaving) return;
+    FocusScope.of(context).unfocus();
+
     final phone = _searchController.text.trim();
     if (phone.isEmpty) {
       _showMessage('ادخل رقم التليفون للبحث', isError: true);
@@ -79,6 +82,9 @@ class _CustomerEntryScreenState extends ConsumerState<CustomerEntryScreen> {
   }
 
   Future<void> _createCustomer() async {
+    if (_isSaving || _isSearching) return;
+    FocusScope.of(context).unfocus();
+
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _isSaving = true);
@@ -133,6 +139,7 @@ class _CustomerEntryScreenState extends ConsumerState<CustomerEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.viewInsetsOf(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('بيانات العميل'),
@@ -150,7 +157,8 @@ class _CustomerEntryScreenState extends ConsumerState<CustomerEntryScreen> {
               padding: EdgeInsets.symmetric(
                 horizontal: isWide ? 48 : 20,
                 vertical: isWide ? 32 : 20,
-              ),
+              ).copyWith(bottom: (isWide ? 32 : 20) + viewInsets.bottom),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1120),
@@ -220,7 +228,7 @@ class _CustomerEntryScreenState extends ConsumerState<CustomerEntryScreen> {
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: () => _goToPos(),
+            onPressed: isBusy ? null : () => _goToPos(),
             icon: const Icon(Icons.person_outline_rounded),
             label: const Text('متابعة كعميل عادي'),
           ),
@@ -394,6 +402,8 @@ class _CreateCustomerForm extends StatelessWidget {
               controller: notesController,
               minLines: 3,
               maxLines: 4,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
               decoration: _inputDecoration(
                 label: 'ملاحظات',
                 icon: Icons.notes_rounded,

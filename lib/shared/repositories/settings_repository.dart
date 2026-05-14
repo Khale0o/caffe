@@ -42,4 +42,16 @@ class SettingsRepository {
       'value': value,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
+
+  Future<void> setValues(Map<String, String?> values) async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      for (final entry in values.entries) {
+        await txn.insert(DatabaseTables.settings, {
+          'key': entry.key,
+          'value': entry.value,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
+  }
 }

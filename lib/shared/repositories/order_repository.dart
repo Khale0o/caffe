@@ -36,7 +36,7 @@ class OrderRepository {
       }
 
       if (order.customerId != null) {
-        await txn.rawUpdate(
+        final updatedCustomers = await txn.rawUpdate(
           '''
           UPDATE ${DatabaseTables.customers}
           SET order_count = order_count + 1,
@@ -45,6 +45,9 @@ class OrderRepository {
           ''',
           [DateTime.now().toIso8601String(), order.customerId],
         );
+        if (updatedCustomers == 0) {
+          throw StateError('Cannot save an order for an invalid customer id.');
+        }
       }
 
       return orderId;
