@@ -20,6 +20,8 @@ class AppDatabase {
     return initialize();
   }
 
+  Future<String> get databasePath => _databasePath();
+
   Future<Database> initialize() async {
     if (_database != null) return _database!;
 

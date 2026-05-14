@@ -1,13 +1,12 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/admin/presentation/admin_screen.dart';
+import '../../features/backup/presentation/backup_screen.dart';
 import '../../features/customer_entry/presentation/customer_entry_screen.dart';
 import '../../features/orders/presentation/orders_history_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/welcome/presentation/welcome_screen.dart';
-import '../theme/app_colors.dart';
 
 class AppRoutes {
   const AppRoutes._();
@@ -60,7 +59,7 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.settings,
       name: 'settings',
-      builder: (context, state) => const _PlaceholderScreen(title: 'الإعدادات'),
+      builder: (context, state) => const BackupScreen(),
     ),
     GoRoute(
       path: AppRoutes.orders,
@@ -69,41 +68,3 @@ final appRouter = GoRouter(
     ),
   ],
 );
-
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        leading: IconButton(
-          onPressed: () => context.go(AppRoutes.welcome),
-          icon: const Icon(Icons.arrow_forward_rounded),
-          tooltip: 'رجوع',
-        ),
-      ),
-      body: Center(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          margin: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: AppColors.accentBrown.withValues(alpha: 0.45),
-            ),
-          ),
-          child: Text(
-            'سيتم تنفيذ هذه الشاشة في مرحلة لاحقة',
-            style: Theme.of(context).textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-    );
-  }
-}
