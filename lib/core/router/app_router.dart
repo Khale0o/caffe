@@ -5,6 +5,7 @@ import '../../features/admin/presentation/admin_screen.dart';
 import '../../features/customer_entry/presentation/customer_entry_screen.dart';
 import '../../features/orders/presentation/orders_history_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
+import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/welcome/presentation/welcome_screen.dart';
 import '../theme/app_colors.dart';
 
@@ -54,7 +55,7 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.reports,
       name: 'reports',
-      builder: (context, state) => const _PlaceholderScreen(title: 'التقارير'),
+      builder: (context, state) => const ReportsScreen(),
     ),
     GoRoute(
       path: AppRoutes.settings,
